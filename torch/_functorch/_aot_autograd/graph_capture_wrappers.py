@@ -289,11 +289,15 @@ def create_joint(
     ]:
         outs_descs = None
         if primals_descs is None:
-            outs, tangent_mask = fn(*primals)
+            with set_partitioner_tag_is_forward():
+                outs, tangent_mask = fn(*primals)
             assert not pytree.tree_any(lambda x: isinstance(x, AOTOutput), tangent_mask)
         else:
+            def fn_wrapped(*args, **kwargs):
+                with set_partitioner_tag_is_forward():
+                    return fn(*args, **kwargs)
             (outs, tangent_mask), (outs_descs, _) = call_and_expect_output_descs(
-                fn, primals
+                fn_wrapped, primals
             )
 
         # TODO: I think this hook can also be eliminated now
@@ -557,6 +561,10 @@ def set_partitioner_tag(tag: str):
 
 def set_partitioner_tag_is_backward():
     return set_partitioner_tag("is_backward")
+
+
+def set_partitioner_tag_is_forward():
+    return set_partitioner_tag("is_forward")
 
 
 def set_partitioner_tag_must_be_in_backward():
